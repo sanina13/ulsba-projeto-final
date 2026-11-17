@@ -404,6 +404,54 @@ h1, h2, h3, h4, h5, h6 {
   color: var(--ulsba-verde-claro-texto);
 }
 
+/* ===== Calendário de voltas (Agenda) — responsividade ===== */
+/* Os selects de filtro não tinham largura mínima: em ecrãs estreitos
+   ficavam espremidos ao tamanho do texto da opção selecionada. Com
+   flex: 1 1 160px crescem em conjunto até preencherem a linha e, abaixo
+   de 576px, passam a ocupar a linha toda (um por baixo do outro). */
+.agenda-filtro-select {
+  flex: 1 1 160px;
+}
+
+@media (max-width: 575.98px) {
+  .agenda-filtro-select {
+    flex: 1 1 100%;
+  }
+}
+
+/* O react-big-calendar desenha uma grelha fixa de 7 colunas: em ecrãs
+   estreitos não há espaço para mostrar hora+equipa dentro de cada
+   evento sem obrigar a scroll horizontal (pouco prático em mobile).
+   Em vez disso, cada evento passa a ser só um pontinho colorido — a
+   cor (definida pelo eventPropGetter, inline, por estado) mantém-se,
+   só o tamanho e o texto interno mudam.
+   O !important é necessário para sobrepor o style inline do componente
+   Calendar/evento — uma regra !important numa folha de estilos tem
+   prioridade sobre um style inline sem !important. */
+@media (max-width: 767.98px) {
+  .agenda-calendar-scroll .rbc-calendar {
+    height: 65vh !important;
+    min-height: 420px !important;
+  }
+
+  .agenda-calendar-scroll .rbc-event {
+    width: 70% !important;
+    height: 4px !important;
+    min-height: 4px !important;
+    padding: 0 !important;
+    margin: 1px auto !important;
+    border-radius: 2px;
+  }
+
+  .agenda-calendar-scroll .rbc-event-content {
+    overflow: visible;
+  }
+
+  .agenda-evento {
+    display: none;
+  }
+}
+
 /* ===== Cabeçalhos de tabela (maiúsculas pequenas) ===== */
 .ulsba-table-head {
   font-size: 0.75rem;
