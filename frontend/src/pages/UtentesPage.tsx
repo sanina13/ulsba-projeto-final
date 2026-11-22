@@ -11,6 +11,8 @@ import { comAtrasoMinimo } from '../utils/comAtrasoMinimo';
 import { filtrarUtentes, filtrosVazios, type FiltrosUtentes } from '../utils/filtrosUtentes';
 import { formatarData } from '../utils/formatarData';
 
+// Lista de utentes com pesquisa por nome/número, filtros avançados, paginação
+// e modais para ver/editar um utente sem saír desta página.
 const UtentesPage: React.FC = () => {
   const [termoPesquisa, setTermoPesquisa] = useState('');
   const [utentes, setUtentes] = useState<Utente[]>([]);
@@ -28,6 +30,8 @@ const UtentesPage: React.FC = () => {
 
   const navigate = useNavigate();
 
+  // comAtrasoMinimo garante um tempo mínimo no ecrã de carregamento, para não
+  // "piscar" quando a resposta do servidor é demasiado rápida.
   useEffect(() => {
     comAtrasoMinimo(getUtentes()).then(setUtentes).finally(() => setCarregando(false));
   }, []);
@@ -50,6 +54,9 @@ const UtentesPage: React.FC = () => {
     if (estado === 'Ativo') {
       return <span className="badge bg-success bg-opacity-10 text-success border border-success border-opacity-25 px-2 py-1 rounded-pill">Ativo</span>;
     }
+    if (estado === 'Referenciado') {
+      return <span className="badge bg-warning bg-opacity-10 text-warning border border-warning border-opacity-25 px-2 py-1 rounded-pill">Referenciado</span>;
+    }
     return <span className="badge bg-secondary bg-opacity-10 text-secondary border border-secondary border-opacity-25 px-2 py-1 rounded-pill">Inativo</span>;
   };
 
@@ -66,11 +73,16 @@ const UtentesPage: React.FC = () => {
     );
   };
 
+  // Aplica primeiro os filtros avançados (painel de filtros) e depois a
+  // pesquisa livre por nome ou número de utente, só no texto já filtrado.
   const termo = termoPesquisa.trim().toLowerCase();
   const utentesFiltrados = filtrarUtentes(utentes, filtros).filter((u) =>
     !termo || u.nome.toLowerCase().includes(termo) || u.numeroUtente.toLowerCase().includes(termo),
   );
 
+  // Paginação client-side sobre a lista já filtrada. paginaValida garante que,
+  // se um filtro reduzir o número de páginas, a página atual nunca fica
+  // "fora dos limites" (ex.: estava na página 5 e só restam 2).
   const totalPaginas = Math.max(1, Math.ceil(utentesFiltrados.length / ITENS_POR_PAGINA));
   const paginaValida = Math.min(paginaAtual, totalPaginas);
   const utentesDaPagina = utentesFiltrados.slice(
@@ -78,21 +90,28 @@ const UtentesPage: React.FC = () => {
     paginaValida * ITENS_POR_PAGINA,
   );
 
+  // Abre o modal de visualização (só leitura) para o utente selecionado.
   const abrirVisualizacao = (utente: Utente) => {
     setUtenteEmFoco(utente);
     setModalVerAberto(true);
   };
 
+  // Abre diretamente o modal de edição para o utente selecionado.
   const abrirEdicao = (utente: Utente) => {
     setUtenteEmFoco(utente);
     setModalEditarAberto(true);
   };
 
+  // Permite passar do modal "Ver" para o modal "Editar" sem fechar e reabrir
+  // a ficha do mesmo utente (botão "Editar" dentro do modal de visualização).
   const passarDeVerParaEditar = () => {
     setModalVerAberto(false);
     setModalEditarAberto(true);
   };
 
+  // Guarda as alterações feitas no modal de edição: persiste no backend e
+  // substitui o utente na lista local pela versão atualizada devolvida pela
+  // API (evita um novo GET à lista completa só para refletir esta alteração).
   const guardarEdicao = async (utenteAtualizado: Utente) => {
     const resultado = await updateUtente(utenteAtualizado);
 

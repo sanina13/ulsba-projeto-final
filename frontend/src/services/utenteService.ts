@@ -1,8 +1,9 @@
 import type { Utente } from '../types/utente';
 import { apiFetch } from './apiClient';
 
-// Forma real da resposta da API (snake_case, só os campos não-clínicos —
-// situação clínica e notas ficam de fora por omissão, RNF22).
+// Forma real da resposta da API (snake_case). Situação clínica e notas já
+// vêm desde a migração 0005 (antes a vista vw_utente_ficha não as expunha) —
+// o histórico continua por implementar no backend.
 interface UtenteDTO {
   utente_id: number;
   numero_utente: string;
@@ -19,12 +20,14 @@ interface UtenteDTO {
   localidade: string | null;
   concelho: string | null;
   cuidador_principal_nome: string | null;
+  situacao_clinica: string | null;
+  notas: string | null;
   lat: number | null;
   lng: number | null;
 }
 
-// A API ainda não devolve situação clínica, notas nem histórico no resumo —
-// ficam com valores vazios/seguros até existirem esses endpoints/campos.
+// O histórico de prioridade/complexidade continua por implementar no
+// backend — ficam com valores vazios até existirem esses endpoints.
 function mapearUtente(dto: UtenteDTO): Utente {
   return {
     id: dto.utente_id,
@@ -35,28 +38,30 @@ function mapearUtente(dto: UtenteDTO): Utente {
     telefone: dto.contacto_telefonico ?? '',
     equipaResponsavel: dto.equipa_responsavel_codigo ? `Equipa ${dto.equipa_responsavel_codigo}` : '',
     cuidadorPrincipal: dto.cuidador_principal_nome ?? '',
-    situacaoClinica: [],
+    situacaoClinica: dto.situacao_clinica ? dto.situacao_clinica.split('\n') : [],
     tipoLocal: 'Domicílio',
     ruaNumero: dto.morada ?? '',
     codigoPostal: dto.codigo_postal ?? '',
     localidade: dto.localidade ?? '',
     concelho: dto.concelho ?? '',
-    lat: dto.lat ?? 0,
-    lng: dto.lng ?? 0,
-    notas: '',
+    lat: dto.lat,
+    lng: dto.lng,
+    notas: dto.notas ?? '',
     prioridade: (dto.urgencia_designacao ?? '') as Utente['prioridade'],
     historicoPrioridade: [],
     complexidade: (dto.complexidade_designacao ?? '') as Utente['complexidade'],
     historicoComplexidade: [],
-    estado: dto.estado === 'ATIVO' ? 'Ativo' : 'Inativo',
+    estado: dto.estado === 'ATIVO' ? 'Ativo' : dto.estado === 'REFERENCIADO' ? 'Referenciado' : 'Inativo',
   };
 }
 
+// Lista todos os utentes, já convertidos para o formato usado no frontend.
 export async function getUtentes(): Promise<Utente[]> {
   const dtos = await apiFetch<UtenteDTO[]>('/utentes');
   return dtos.map(mapearUtente);
 }
 
+// Obtém a ficha completa de um utente pelo id.
 export async function getUtenteById(id: string): Promise<Utente> {
   const dto = await apiFetch<UtenteDTO>(`/utentes/${id}`);
   return mapearUtente(dto);
@@ -75,6 +80,8 @@ export interface NovoUtentePayload {
   notas?: string;
 }
 
+// Cria um novo utente a partir dos dados do formulário, convertendo para snake_case
+// antes de enviar à API e devolvendo já o Utente completo (com id e campos derivados).
 export async function createUtente(dados: NovoUtentePayload): Promise<Utente> {
   const dto = await apiFetch<UtenteDTO>('/utentes', {
     method: 'POST',
@@ -110,6 +117,32 @@ export async function updateUtente(utenteAtualizado: Utente): Promise<Utente> {
   return mapearUtente(dto);
 }
 
+// Atualiza as coordenadas (lat/lng) do local associado a este utente — usado,
+// por exemplo, quando o utilizador ajusta manualmente a posição no mapa.
+export async function atualizarCoordenadasUtente(
+  utenteId: Utente['id'],
+  lat: number,
+  lng: number,
+): Promise<Utente> {
+  const dto = await apiFetch<UtenteDTO>(`/utentes/${utenteId}/coordenadas`, {
+    method: 'PUT',
+    body: JSON.stringify({ lat, lng }),
+  });
+  return mapearUtente(dto);
+}
+
+// Atualiza as coordenadas de um local diretamente (sem passar por um utente específico).
+export async function atualizarCoordenadasLocal(
+  localId: number,
+  lat: number,
+  lng: number,
+): Promise<{ id: number; lat: number; lng: number }> {
+  return apiFetch<{ id: number; lat: number; lng: number }>(`/locais/${localId}/coordenadas`, {
+    method: 'PUT',
+    body: JSON.stringify({ lat, lng }),
+  });
+}
+
 // Alterar prioridade/complexidade/equipa são endpoints próprios (não fazem
 // parte do PUT) porque cada um gera um registo de histórico auditável.
 export async function alterarPrioridade(utenteId: Utente['id'], nivelUrgenciaId: number, motivo: string): Promise<void> {
@@ -131,4 +164,24 @@ export async function alterarEquipaResponsavel(utenteId: Utente['id'], equipaId:
     method: 'POST',
     body: JSON.stringify({ equipa_id: equipaId, motivo: motivo || null }),
   });
+}
+
+// Ativar/inativar são endpoints próprios (não o PUT normal) porque geram um
+// registo no histórico de transições de estado do utente.
+// Reativa um utente previamente inativo/referenciado, registando o motivo no histórico.
+export async function ativarUtente(utenteId: Utente['id'], motivo: string): Promise<Utente> {
+  const dto = await apiFetch<UtenteDTO>(`/utentes/${utenteId}/ativar`, {
+    method: 'PUT',
+    body: JSON.stringify({ motivo }),
+  });
+  return mapearUtente(dto);
+}
+
+// Inativa um utente (ex.: óbito, alta, transferência), registando o motivo no histórico.
+export async function inativarUtente(utenteId: Utente['id'], motivo: string): Promise<Utente> {
+  const dto = await apiFetch<UtenteDTO>(`/utentes/${utenteId}/inativar`, {
+    method: 'PUT',
+    body: JSON.stringify({ motivo }),
+  });
+  return mapearUtente(dto);
 }
