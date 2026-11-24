@@ -167,11 +167,23 @@ function EventoCalendario({ event }: EventProps<EventoAgenda>) {
 function BarraCalendario({ label, onNavigate }: ToolbarProps<EventoAgenda>) {
   return (
     <div className="d-flex align-items-center justify-content-center gap-3 mb-3">
-      <button type="button" className="btn btn-sm btn-outline-secondary" onClick={() => onNavigate('PREV')}>
+      <button
+        type="button"
+        className="btn btn-sm btn-outline-secondary"
+        aria-label="Mês anterior"
+        style={{ minWidth: '44px', minHeight: '44px' }}
+        onClick={() => onNavigate('PREV')}
+      >
         <i className="bi bi-chevron-left"></i>
       </button>
       <span className="fw-medium text-capitalize">{label}</span>
-      <button type="button" className="btn btn-sm btn-outline-secondary" onClick={() => onNavigate('NEXT')}>
+      <button
+        type="button"
+        className="btn btn-sm btn-outline-secondary"
+        aria-label="Mês seguinte"
+        style={{ minWidth: '44px', minHeight: '44px' }}
+        onClick={() => onNavigate('NEXT')}
+      >
         <i className="bi bi-chevron-right"></i>
       </button>
     </div>
@@ -429,6 +441,11 @@ const AgendaPage = () => {
     return [...eventosVoltas, ...eventosBloqueios];
   }, [vista, voltas, visitas, bloqueiosVisiveisNoCalendario, mapaMatriculas]);
 
+  const eventosOrdenados = useMemo(
+    () => [...eventos].sort((a, b) => a.start.getTime() - b.start.getTime()),
+    [eventos],
+  );
+
   // Define a cor/estilo de cada evento no calendário (eventPropGetter): os
   // bloqueios de viatura usam um estilo tracejado distinto (laranja para
   // manutenção, vermelho para indisponibilidade pontual) para se distinguirem
@@ -539,11 +556,13 @@ const AgendaPage = () => {
       </div>
 
       {/* Separadores de perspetiva: Unidade / Profissional / Utente (RF19) */}
-      <ul className="nav nav-pills mb-3">
+      <ul className="nav nav-pills flex-wrap gap-2 mb-3" aria-label="Perspetiva da agenda">
         <li className="nav-item">
           <button
             type="button"
             className={`nav-link ${vista === 'unidade' ? 'active' : ''}`}
+            aria-pressed={vista === 'unidade'}
+            style={{ minHeight: '44px' }}
             onClick={() => mudarVista('unidade')}
           >
             Unidade
@@ -553,6 +572,8 @@ const AgendaPage = () => {
           <button
             type="button"
             className={`nav-link ${vista === 'profissional' ? 'active' : ''}`}
+            aria-pressed={vista === 'profissional'}
+            style={{ minHeight: '44px' }}
             onClick={() => mudarVista('profissional')}
           >
             Profissional
@@ -562,6 +583,8 @@ const AgendaPage = () => {
           <button
             type="button"
             className={`nav-link ${vista === 'utente' ? 'active' : ''}`}
+            aria-pressed={vista === 'utente'}
+            style={{ minHeight: '44px' }}
             onClick={() => mudarVista('utente')}
           >
             Utente
@@ -665,6 +688,73 @@ const AgendaPage = () => {
       </div>
 
       <div className="card shadow-sm border-0 flex-grow-1 bg-white p-3">
+        <section className="agenda-lista-mobile d-md-none mb-3" aria-labelledby="agenda-eventos-mobile-titulo">
+          <div className="mb-2">
+            <h2 id="agenda-eventos-mobile-titulo" className="h6 fw-semibold mb-1 text-capitalize">
+              Eventos de {format(dataAtual, 'MMMM yyyy', { locale: pt })}
+            </h2>
+            <p className="small text-muted mb-0">
+              Toca num evento para abrir os detalhes. Usa o calendário abaixo para consultar ou planear outro dia.
+            </p>
+          </div>
+
+          {eventosOrdenados.length === 0 ? (
+            <p className="small text-muted border rounded p-3 mb-0">
+              Não há eventos neste mês com os filtros selecionados.
+            </p>
+          ) : (
+            <div className="d-flex flex-column gap-2">
+              {eventosOrdenados.map((evento) => {
+                const ehBloqueio = evento.tipo === 'bloqueio_viatura';
+                const titulo = evento.tipo === 'volta'
+                  ? evento.title
+                  : evento.tipo === 'visita'
+                    ? evento.resource.utenteNome
+                    : `${evento.matricula} · ${evento.resource.tipo === 'MANUTENCAO' ? 'Manutenção' : 'Indisponível'}`;
+                const data = ehBloqueio
+                  ? isSameDay(evento.start, evento.end)
+                    ? format(evento.start, 'd MMM', { locale: pt })
+                    : `${format(evento.start, 'd MMM', { locale: pt })} – ${format(evento.end, 'd MMM', { locale: pt })}`
+                  : format(evento.start, 'd MMM', { locale: pt });
+                const detalhe = evento.tipo === 'volta'
+                  ? `${format(evento.start, 'HH:mm')}–${format(evento.end, 'HH:mm')} · ${evento.resource.equipaCodigo ? `Equipa ${evento.resource.equipaCodigo}` : 'Sem equipa'} · ${LABEL_ESTADO_VOLTA[evento.resource.estado]}`
+                  : evento.tipo === 'visita'
+                    ? `${format(evento.start, 'HH:mm')}–${format(evento.end, 'HH:mm')} · ${LABEL_ESTADO_VISITA[evento.resource.visitaEstado]}`
+                    : evento.resource.motivo || 'Bloqueio de viatura';
+                const cor = evento.tipo === 'bloqueio_viatura'
+                  ? evento.resource.tipo === 'MANUTENCAO' ? '#fd7e14' : '#dc3545'
+                  : evento.cor;
+
+                return (
+                  <button
+                    key={`${evento.tipo}-${evento.id}`}
+                    type="button"
+                    className="agenda-evento-mobile-item btn btn-light border d-flex align-items-center gap-3 text-start"
+                    aria-label={`Abrir ${evento.tipo === 'bloqueio_viatura' ? 'bloqueio' : evento.tipo}: ${titulo}, ${data}, ${detalhe}`}
+                    onClick={() => {
+                      if (ehBloqueio) {
+                        abrirDia(evento.start);
+                      } else {
+                        navigate(`/agenda/voltas/${evento.voltaId}`);
+                      }
+                    }}
+                  >
+                    <span className="agenda-evento-mobile-data text-center text-muted small flex-shrink-0">
+                      {data}
+                    </span>
+                    <span className="rounded-circle flex-shrink-0" aria-hidden="true" style={{ width: '10px', height: '10px', backgroundColor: cor }} />
+                    <span className="d-flex flex-column flex-grow-1" style={{ minWidth: 0 }}>
+                      <span className="fw-medium text-dark text-truncate">{titulo}</span>
+                      <span className="small text-muted text-truncate">{detalhe}</span>
+                    </span>
+                    <i className="bi bi-chevron-right text-muted small" aria-hidden="true" />
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </section>
+
         <div className="agenda-calendar-scroll">
           <Calendar<EventoAgenda>
             localizer={localizer}

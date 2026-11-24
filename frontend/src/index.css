@@ -240,6 +240,36 @@ h1, h2, h3, h4, h5, h6 {
   padding: 18px 17px 23px;
 }
 
+/* Botão Fechar do drawer — só visível no modo retrátil (<992px).
+   Alvo de toque de 44x44 e anel de foco visível sobre o fundo escuro. */
+.side-drawer-fechar {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  width: 44px;
+  height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.08);
+  color: #eef4f1;
+  font-size: 18px;
+  z-index: 1;
+}
+
+.side-drawer-fechar:hover,
+.side-drawer-fechar:focus-visible {
+  background: rgba(255, 255, 255, 0.16);
+  color: #fff;
+}
+
+.side-drawer-fechar:focus-visible {
+  outline: 2px solid #89d6ab;
+  outline-offset: 2px;
+}
+
 .side-foot {
   color: #6f9385;
   text-align: center;
@@ -256,12 +286,26 @@ h1, h2, h3, h4, h5, h6 {
     left: 0;
     z-index: 1045;
     transform: translateX(-100%);
-    transition: transform 0.22s ease;
+    visibility: hidden;
+    transition: transform 0.22s ease, visibility 0s linear 0.22s;
     box-shadow: 0 0 24px rgba(0, 0, 0, 0.25);
   }
 
   .side-panel.side-panel-aberto {
     transform: translateX(0);
+    visibility: visible;
+    transition: transform 0.22s ease, visibility 0s;
+  }
+
+  /* Foco programático no painel (ao abrir o drawer) sem anel no contentor;
+     os controlos mantêm os seus próprios indicadores de foco. */
+  .side-panel:focus {
+    outline: none;
+  }
+
+  /* Espaço para o botão Fechar não sobrepor a marca. */
+  .brand-lockup {
+    padding-right: 68px;
   }
 }
 
@@ -309,6 +353,10 @@ h1, h2, h3, h4, h5, h6 {
     overflow: visible !important;
   }
 
+  .viaturas-mobile-actions .btn {
+    min-height: 44px;
+  }
+
   .dashboard-row {
     overflow: visible !important;
   }
@@ -335,8 +383,12 @@ h1, h2, h3, h4, h5, h6 {
     max-height: none !important;
   }
 
+  /* 420px (não 380px) para corresponder ao min-height:420px do cartão do
+     MapaLeaflet (ver MapaLeaflet.tsx) — com a coluna mais baixa do que esse
+     mínimo, o overflow:hidden de .dashboard-col (acima) recortava ~40px do
+     fundo do mapa (incluindo controlos), sem barra de scroll a avisar. */
   .dashboard-col-mapa.dashboard-col-mapa {
-    height: 380px !important;
+    height: 420px !important;
   }
 
   .dashboard-col-prioridades.dashboard-col-prioridades {
@@ -387,11 +439,12 @@ h1, h2, h3, h4, h5, h6 {
   }
 }
 
-/* Botão do menu — valores tirados do CSS da referência (.mobile-menu) */
+/* Botão do menu — valores tirados do CSS da referência (.mobile-menu).
+   44x44 para cumprir o alvo de toque mínimo em mobile. */
 .ulsba-menu-btn {
-  width: 34px;
-  height: 34px;
-  padding: 8px;
+  width: 44px;
+  height: 44px;
+  padding: 10px;
   border-radius: 8px;
   background: var(--ulsba-verde-claro);
   color: var(--ulsba-verde-claro-texto);
@@ -402,6 +455,11 @@ h1, h2, h3, h4, h5, h6 {
 .ulsba-menu-btn:hover {
   background: var(--ulsba-verde-claro);
   color: var(--ulsba-verde-claro-texto);
+}
+
+.ulsba-menu-btn:focus-visible {
+  outline: 2px solid #2d755d;
+  outline-offset: 2px;
 }
 
 /* ===== Calendário de voltas (Agenda) — responsividade ===== */
@@ -449,9 +507,21 @@ h1, h2, h3, h4, h5, h6 {
    Calendar/evento — uma regra !important numa folha de estilos tem
    prioridade sobre um style inline sem !important. */
 @media (max-width: 767.98px) {
+  /* Em mobile a altura NÃO pode ser fixa (65vh): as linhas do mês têm
+     min-height própria e, com um mês de 5–6 semanas, ultrapassavam a caixa
+     do calendário. Como as linhas têm overflow visível, transbordavam por
+     cima da legenda (que ficava por baixo, na posição da caixa de 65vh).
+     Com altura automática a caixa do calendário cresce com as linhas e a
+     legenda é empurrada para baixo, sem sobreposição; o scroll é o da
+     página, tal como em desktop. */
   .agenda-calendar-scroll .rbc-calendar {
-    height: 65vh !important;
-    min-height: 420px !important;
+    height: auto !important;
+    min-height: 0 !important;
+  }
+
+  .agenda-calendar-scroll .rbc-month-view {
+    height: auto;
+    flex: 0 0 auto;
   }
 
   .agenda-calendar-scroll .rbc-event {
@@ -469,6 +539,16 @@ h1, h2, h3, h4, h5, h6 {
 
   .agenda-evento {
     display: none;
+  }
+
+  .agenda-evento-mobile-item.agenda-evento-mobile-item {
+    min-height: 56px;
+    padding: 0.65rem 0.75rem;
+  }
+
+  .agenda-evento-mobile-data {
+    min-width: 4.5rem;
+    text-transform: capitalize;
   }
 }
 
